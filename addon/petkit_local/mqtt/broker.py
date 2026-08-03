@@ -57,13 +57,46 @@ def _get_host_ip() -> str | None:
         return None
 
 
-def ensure_self_signed(cert_path: str, key_path: str) -> bool:
+def _cert_covers(cert_path: str, hosts: list[str]) -> bool:
+    """Whether the existing cert's SAN already covers every host in `hosts`.
+
+    Load-bearing for the bucket: the device uploads media to `api_url`'s host
+    (a LoadBalancer IP, not this pod's), and unlike MQTT — where the patched
+    mbedtls skips verification — the `cloud` binary DOES verify the bucket's TLS
+    cert against the connect address. A cert whose only IP SAN is the pod IP is
+    rejected at the handshake, so the device connects to :9000 and never PUTs.
+    Returns False (→ regenerate) when it cannot prove coverage.
+    """
+    if not hosts:
+        return True
+    try:
+        from cryptography import x509
+        import ipaddress
+        cert = x509.load_pem_x509_certificate(open(cert_path, "rb").read())
+        san = cert.extensions.get_extension_for_class(x509.SubjectAlternativeName).value
+        cert_ips = {str(ip) for ip in san.get_values_for_type(x509.IPAddress)}
+        cert_dns = set(san.get_values_for_type(x509.DNSName))
+        for h in hosts:
+            try:
+                if str(ipaddress.ip_address(h)) not in cert_ips:
+                    return False
+            except ValueError:
+                if h not in cert_dns:
+                    return False
+        return True
+    except Exception:
+        return False
+
+
+def ensure_self_signed(cert_path: str, key_path: str, extra_hosts: list[str] | None = None) -> bool:
     """Generate a self-signed cert/key pair at the given paths if missing.
 
     Self-signed is sufficient because the device's mbedtls is patched to skip
-    verification (see the repo's CLAUDE.md on cert pinning). The SAN carries
-    the host IP anyway so that clients which DO check the hostname — curl with
-    VERIFYHOST, for one — can still be pointed at the broker for debugging.
+    verification on MQTT (see the repo's CLAUDE.md on cert pinning). The bucket
+    is different: the `cloud` binary verifies the cert against the address it
+    uploads to, so `extra_hosts` (the bucket/api_url host) MUST be in the SAN or
+    the upload fails at the TLS handshake. An existing cert that does not cover
+    them is regenerated in place.
 
     Returns:
         True if a usable cert exists afterwards, including the case where one
@@ -71,8 +104,11 @@ def ensure_self_signed(cert_path: str, key_path: str) -> bool:
         failed; the caller then starts without a TLS listener rather than not
         starting at all.
     """
+    extra_hosts = [h for h in (extra_hosts or []) if h]
     if os.path.exists(cert_path) and os.path.exists(key_path):
-        return True
+        if _cert_covers(cert_path, extra_hosts):
+            return True
+        log.info("Cert %s missing SAN host(s) %s — regenerating", cert_path, extra_hosts)
     try:
         from cryptography import x509
         from cryptography.hazmat.primitives import hashes, serialization
@@ -84,8 +120,22 @@ def ensure_self_signed(cert_path: str, key_path: str) -> bool:
         key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
         name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "petkit-local")])
         san_names = [x509.DNSName("petkit-local")]
+        seen_ips: set[str] = set()
         if host_ip:
-            san_names.append(x509.IPAddress(ipaddress.ip_address(host_ip)))
+            try:
+                san_names.append(x509.IPAddress(ipaddress.ip_address(host_ip)))
+                seen_ips.add(host_ip)
+            except ValueError:
+                pass
+        # The bucket/api_url host the device actually connects to.
+        for h in extra_hosts:
+            try:
+                ip = ipaddress.ip_address(h)
+                if str(ip) not in seen_ips:
+                    san_names.append(x509.IPAddress(ip))
+                    seen_ips.add(str(ip))
+            except ValueError:
+                san_names.append(x509.DNSName(h))
         now = datetime.datetime.utcnow()
         cert = (
             x509.CertificateBuilder()

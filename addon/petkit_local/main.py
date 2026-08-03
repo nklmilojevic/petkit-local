@@ -455,7 +455,11 @@ def main() -> None:
         try:
             from petkit_local.mqtt.broker import ensure_self_signed
             bkt_key = config.mqtt_key or f"{config.data_dir}/certs/broker.key"
-            if ensure_self_signed(cert_path, bkt_key):
+            # The device uploads media to api_url's host (the LB IP), and the
+            # cloud binary verifies the bucket cert against it — so that host
+            # MUST be in the SAN or the upload fails at the TLS handshake.
+            bkt_host = urlparse(config.api_url).hostname
+            if ensure_self_signed(cert_path, bkt_key, extra_hosts=[bkt_host] if bkt_host else None):
                 bkt_ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
                 bkt_ctx.load_cert_chain(cert_path, bkt_key)
         except Exception as e:
