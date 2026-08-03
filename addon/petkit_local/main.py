@@ -454,6 +454,7 @@ def main() -> None:
         bkt_ctx = None
         try:
             from petkit_local.mqtt.broker import ensure_self_signed
+            from urllib.parse import urlparse
             bkt_key = config.mqtt_key or f"{config.data_dir}/certs/broker.key"
             # The device uploads media to api_url's host (the LB IP), and the
             # cloud binary verifies the bucket cert against it — so that host
