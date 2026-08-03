@@ -590,6 +590,14 @@ class Device:
                     "eatDetection": 1, "eatSensitivity": 3,
                     "soundEnable": 0, "systemSoundEnable": 0,
                     "volume": 4, "smartFrame": 1,
+                    # Media-upload enables the device needs to stage+upload a
+                    # clip on a feed. Absent, `ctrl` sets g_config_feedPicture=0
+                    # and logs "feed not upload pic and video ..." (RE of the
+                    # D4H binaries): `feedPicture` is the direct gate, `eatVideo`
+                    # the eat-clip enable, `upload` the master switch (the litter
+                    # camera block already carries `upload:1`). The device does
+                    # not report these, so they must be seeded or they stay off.
+                    "feedPicture": 1, "eatVideo": 1, "upload": 1,
                 })
             return base
         if self.is_water_fountain:
