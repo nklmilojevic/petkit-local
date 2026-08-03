@@ -470,9 +470,33 @@ class Device:
             "hertz": 50,
         }
 
-        if self.is_litter and self.is_camera:
+        if self.is_camera:
             now = int(time.time())
             far = 4102444800
+            # The cloud-subscription/service block. The device parses this into
+            # `pkg_service[].indate/workTime` (`parse_recv_property_cloud_service`
+            # in `ctrl`) and gates CLOUD STORAGE — its event/lapse/storage
+            # services — on a still-valid `indate`. Without it a camera FEEDER
+            # (D4H/D4SH) records the eat/event video but never stages or uploads
+            # it: `ctrl` logs "feed not upload pic and video ..." and every
+            # event reports `media:0`. It was litter-only before; camera feeders
+            # need the same standing "subscription" to upload to our bucket.
+            # Mirrors to_oss_sts's capability[] — a disabled capability must
+            # disappear from BOTH so the device sees one answer about uploads.
+            result["capacity"] = [
+                {"name": ct, "workTime": now, "indate": far}
+                for ct in self.CAPABILITY_TYPES if ct in self.enabled_capabilities()
+            ]
+            result["cloudProduct"] = {
+                "serviceId": 0,
+                "name": "Local",
+                "workTime": now,
+                "workIndate": far,
+                "chargeType": "LOCAL",
+                "subscribe": 0,
+            }
+
+        if self.is_litter and self.is_camera:
             result["sprayDays"] = SPRAY_TOTAL_DAYS
             # Falls back to the stamp we recorded, because `state` is empty for
             # the first moments after a restart and the firmware has a setter
@@ -487,21 +511,6 @@ class Device:
             result["frequencyPetTip"] = 0
             result["deodorantTip"] = 0
             result["purificationTip"] = 0
-            # Mirrors to_oss_sts's capability[] set — a disabled capability
-            # must disappear from BOTH so the device doesn't see conflicting
-            # answers about what it's allowed to upload.
-            result["capacity"] = [
-                {"name": ct, "workTime": now, "indate": far}
-                for ct in self.CAPABILITY_TYPES if ct in self.enabled_capabilities()
-            ]
-            result["cloudProduct"] = {
-                "serviceId": 0,
-                "name": "Local",
-                "workTime": now,
-                "workIndate": far,
-                "chargeType": "LOCAL",
-                "subscribe": 0,
-            }
 
         if ble_registry and self.is_litter:
             k3 = ble_registry.get_linked_k3(self.petkit_id)
