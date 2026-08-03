@@ -168,6 +168,13 @@ FEEDER_ACTIONS = {
     # HTTP endpoints in the cloud API; delivered as property.set locally (best-effort)
     "reset_desiccant": lambda: (PROPERTY_SET_SUFFIX, make_mqtt_property_set({"desiccantTime": 0})),
     "food_replenished": lambda: (PROPERTY_SET_SUFFIX, make_mqtt_property_set({"food": 1})),
+    # Push the media-upload enables to the device at RUNTIME (property.set),
+    # rather than only seeding them in the settings block the device reads at
+    # boot. This is what flips g_config_feedPicture on a live device so a feed
+    # actually stages+uploads a clip (RE of ctrl: "feed not upload pic and
+    # video: ..., feedPicture, ...").
+    "enable_feed_video": lambda: (PROPERTY_SET_SUFFIX,
+                                  make_mqtt_property_set({"feedPicture": 1, "eatVideo": 1, "upload": 1})),
 }
 
 def _fountain_start(code: int) -> Command:

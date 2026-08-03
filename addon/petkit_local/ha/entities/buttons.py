@@ -29,6 +29,7 @@ FEEDER_BUTTONS = [
     EntityDef(component="button", key="reset_desiccant", name="Reset Desiccant", icon="mdi:restart"),
     EntityDef(component="button", key="cancel_manual_feed", name="Cancel Manual Feed", icon="mdi:cancel"),
     EntityDef(component="button", key="food_replenished", name="Food Replenished", icon="mdi:food-apple"),
+    EntityDef(component="button", key="enable_feed_video", name="Enable Feed Video", icon="mdi:video"),
 ]
 
 FOUNTAIN_BUTTONS = [
