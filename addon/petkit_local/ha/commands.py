@@ -110,7 +110,7 @@ def make_mqtt_property_set(params: dict) -> dict[str, Any]:
 
 #: Button key -> the consumable whose replacement date it stamps. Both still
 #: send their device command as well; this only adds the record we keep.
-CONSUMABLE_BUTTONS = {"reset_n50": "n50", "reset_n60": "n60"}
+CONSUMABLE_BUTTONS = {"reset_n50": "n50", "reset_n60": "n60", "reset_desiccant": "desiccant"}
 
 
 def _litter_start(code: int) -> Command:

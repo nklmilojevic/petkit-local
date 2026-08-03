@@ -87,6 +87,10 @@ if TYPE_CHECKING:  # import-cycle-free: base.py imports SPRAY_TOTAL_DAYS from he
 # whole point of this add-on, and this is one of the places that has to mean it.
 SPRAY_TOTAL_DAYS = 45
 DEODORANT_TOTAL_DAYS = 30
+# Camera feeders (D4H/D4SH) never report a desiccant countdown in any transport
+# — it is cloud-computed from the reset, exactly like the N50 above. 30 days is
+# the pack life PetKit's app uses.
+DESICCANT_TOTAL_DAYS = 30
 
 #: Where a replacement date WE recorded lives, inside `Device.config`. It has to
 #: be config rather than `state`: state is rebuilt from the device's next
@@ -98,6 +102,7 @@ CONSUMABLE_RECORD_KEY = "consumables"
 CONSUMABLE_TOTALS = {
     "n50": ("deodorantLeftDays", DEODORANT_TOTAL_DAYS),
     "n60": ("sprayLeftDays", SPRAY_TOTAL_DAYS),
+    "desiccant": ("desiccantLeftDays", DESICCANT_TOTAL_DAYS),
 }
 
 #: OURS, not the device's: no work-mode code means "idle", because the device
@@ -667,6 +672,15 @@ def _parse_feeder(body: dict[str, Any]) -> dict[str, Any]:
             ip = m.group(1)
     if ip:
         state["ip"] = ip
+
+    # Camera feeders report a backup-battery voltage (`batV`, mV) rather than the
+    # `batteryPower` the "Battery Installed" binary sensor reads: an absent pack
+    # sits near 0, a present one at its nominal volts (a D4H on mains reads
+    # ~4400 mV). Only derive it when the device did not send batteryPower itself.
+    if "batteryPower" not in state:
+        batv = to_float(body.get("batV"), 0) or 0
+        if batv > 1000:
+            state["batteryPower"] = 1
 
     _extract_wifi_rssi(body, state)
     return state

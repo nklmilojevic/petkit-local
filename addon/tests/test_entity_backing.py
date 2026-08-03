@@ -134,7 +134,7 @@ PASSTHROUGH_UNVERIFIED = {
     # this key stays what it always was: the other fountains' cloud-model name
     # for a counter nobody here has seen on the wire.
     "filterLeftDays", "lackWarning", "heatRealTemp", "drinkTime",
-    "desiccantLeftDays", "batteryPower",
+    "desiccantLeftDays",
     "bowl", "food", "weight", "feeding", "eating",
     "liquid", "battery", "temp",
 }
