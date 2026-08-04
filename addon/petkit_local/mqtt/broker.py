@@ -88,6 +88,27 @@ def _cert_covers(cert_path: str, hosts: list[str]) -> bool:
         return False
 
 
+def _cert_is_ca(cert_path: str) -> bool:
+    """Whether the existing cert is a usable self-signed trust anchor.
+
+    The `cloud` media uploader's libcurl verifies the bucket cert strictly
+    against `/app/bin/ca.crt`. A self-signed leaf with no `basicConstraints`
+    (our original certs) cannot anchor its own chain, so verification fails with
+    "SSL peer certificate ... was not OK" even though the exact cert is in the
+    bundle — while the non-verifying log-upload path still succeeds, which is why
+    devlog uploads worked but media never did. Returns False (→ regenerate) for
+    a cert missing `basicConstraints: CA:TRUE`, so a stale non-CA cert on the
+    PVC is replaced on upgrade rather than silently kept by `_cert_covers`.
+    """
+    try:
+        from cryptography import x509
+        cert = x509.load_pem_x509_certificate(open(cert_path, "rb").read())
+        bc = cert.extensions.get_extension_for_class(x509.BasicConstraints).value
+        return bool(bc.ca)
+    except Exception:
+        return False
+
+
 def ensure_self_signed(cert_path: str, key_path: str, extra_hosts: list[str] | None = None) -> bool:
     """Generate a self-signed cert/key pair at the given paths if missing.
 
@@ -106,9 +127,10 @@ def ensure_self_signed(cert_path: str, key_path: str, extra_hosts: list[str] | N
     """
     extra_hosts = [h for h in (extra_hosts or []) if h]
     if os.path.exists(cert_path) and os.path.exists(key_path):
-        if _cert_covers(cert_path, extra_hosts):
+        if _cert_covers(cert_path, extra_hosts) and _cert_is_ca(cert_path):
             return True
-        log.info("Cert %s missing SAN host(s) %s — regenerating", cert_path, extra_hosts)
+        log.info("Cert %s missing SAN host(s) %s or not a CA — regenerating",
+                 cert_path, extra_hosts)
     try:
         from cryptography import x509
         from cryptography.hazmat.primitives import hashes, serialization
@@ -121,19 +143,28 @@ def ensure_self_signed(cert_path: str, key_path: str, extra_hosts: list[str] | N
         name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "petkit-local")])
         san_names = [x509.DNSName("petkit-local")]
         seen_ips: set[str] = set()
+
+        def _add_ip(ip_str: str) -> None:
+            # Add each IP as BOTH an IPAddress and a DNSName SAN. The device's
+            # TLS stack matches the literal connect address ("10.40.0.33")
+            # against DNS-type SANs and does not reliably match IPAddress SANs,
+            # so an IP-only SAN fails hostname verification in the cloud
+            # uploader. Belt-and-suspenders: cover both SAN types.
+            if ip_str in seen_ips:
+                return
+            san_names.append(x509.IPAddress(ipaddress.ip_address(ip_str)))
+            san_names.append(x509.DNSName(ip_str))
+            seen_ips.add(ip_str)
+
         if host_ip:
             try:
-                san_names.append(x509.IPAddress(ipaddress.ip_address(host_ip)))
-                seen_ips.add(host_ip)
+                _add_ip(str(ipaddress.ip_address(host_ip)))
             except ValueError:
                 pass
         # The bucket/api_url host the device actually connects to.
         for h in extra_hosts:
             try:
-                ip = ipaddress.ip_address(h)
-                if str(ip) not in seen_ips:
-                    san_names.append(x509.IPAddress(ip))
-                    seen_ips.add(str(ip))
+                _add_ip(str(ipaddress.ip_address(h)))
             except ValueError:
                 san_names.append(x509.DNSName(h))
         now = datetime.datetime.utcnow()
@@ -145,6 +176,22 @@ def ensure_self_signed(cert_path: str, key_path: str, extra_hosts: list[str] | N
             .not_valid_before(now - datetime.timedelta(days=1))
             .not_valid_after(now + datetime.timedelta(days=3650))
             .add_extension(x509.SubjectAlternativeName(san_names), critical=False)
+            # A self-signed cert the `cloud` uploader verifies strictly must be a
+            # valid trust anchor, or libcurl rejects it ("SSL peer certificate
+            # was not OK") even when it is in /app/bin/ca.crt. CA:TRUE + certSign
+            # make it anchor its own single-cert chain.
+            .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+            .add_extension(x509.KeyUsage(
+                digital_signature=True, key_encipherment=True, key_cert_sign=True,
+                crl_sign=True, content_commitment=False, data_encipherment=False,
+                key_agreement=False, encipher_only=False, decipher_only=False),
+                critical=True)
+            .add_extension(
+                x509.SubjectKeyIdentifier.from_public_key(key.public_key()),
+                critical=False)
+            .add_extension(
+                x509.AuthorityKeyIdentifier.from_issuer_public_key(key.public_key()),
+                critical=False)
             .sign(key, hashes.SHA256())
         )
         os.makedirs(os.path.dirname(cert_path) or ".", exist_ok=True)
