@@ -188,7 +188,7 @@ FEEDER_SENSORS = [
 
 FEEDER_BINARY_SENSORS = [
     EntityDef(component="binary_sensor", key="food_low", name="Food Low",
-              value_path="state.food", device_class="problem", icon="mdi:food-drumstick-off"),
+              value_path="state.foodLow", device_class="problem", icon="mdi:food-drumstick-off"),
     EntityDef(component="binary_sensor", key="feeding", name="Feeding",
               value_path="state.feeding", device_class="running", icon="mdi:food"),
     EntityDef(component="binary_sensor", key="eating", name="Eating",

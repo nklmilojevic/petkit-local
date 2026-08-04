@@ -648,6 +648,15 @@ def _parse_feeder(body: dict[str, Any]) -> dict[str, Any]:
         "cameraStatus", "feeding", "eating",
     ], state)
 
+    # `food` is "food present in the hopper": the steady state with a FULL
+    # hopper is 2, and 0 means none detected (also seen transiently while food
+    # moves through during a dispense). The shared "Food Low" problem sensor
+    # read `state.food` through the generic "any truthy value = problem"
+    # template, so a full hopper (food=2) showed as Food Low ON — backwards.
+    # Derive an explicit flag instead: low only when nothing is detected.
+    if "food" in state:
+        state["foodLow"] = 1 if to_float(state.get("food"), 2) == 0 else 0
+
     feed_state = dig(body, "feedState", default=dig(body, "feed_state", default={}))
     if isinstance(feed_state, dict) and feed_state:
         parsed_fs: dict[str, Any] = {}
