@@ -19,10 +19,11 @@ log = logging.getLogger(__name__)
 
 
 def patch_ca_bundle(original: bytes | None, our_cert_pem: bytes) -> bytes:
-    """Append our self-signed cert PEM to the device's CA bundle.
+    """Put exactly ONE copy of our current self-signed cert in the device's CA
+    bundle, dropping any prior copies first.
 
     Raises:
-        ValueError: If either side is not a PEM bundle, or ours is already in.
+        ValueError: If either side is not a PEM bundle.
 
     Both inputs are validated because the failure mode of not doing so is
     severe: this used to treat an empty `original` as "the device has no CA
@@ -30,6 +31,16 @@ def patch_ca_bundle(original: bytes | None, our_cert_pem: bytes) -> bytes:
     over /app/bin/ca.crt — would leave the device unable to verify any other
     TLS peer. Every device ships a bundle (226 KB on a T5, 11 KB on a D4SH), so
     an empty read means the download failed, not that there is nothing to keep.
+
+    Why strip-then-append rather than a blind append: each cert regeneration (a
+    SAN or CA-flag fix) mints a new cert, and appending every time left the OLD
+    ones in the bundle. The device's OpenSSL 1.0.0 picks the FIRST cert whose
+    subject matches the served cert as the trust anchor; if that is a stale,
+    different-key copy, verification fails ("SSL peer certificate ... was not
+    OK") even though the right cert is also present — which is exactly what
+    silently broke media uploads. So every cert sharing our current cert's
+    subject is removed and our current cert appended, leaving one. This also
+    makes re-applying the patch idempotent instead of an error.
     """
     if b"-----BEGIN CERTIFICATE-----" not in our_cert_pem:
         raise ValueError("our_cert_pem is not valid PEM")
@@ -37,18 +48,39 @@ def patch_ca_bundle(original: bytes | None, our_cert_pem: bytes) -> bytes:
     assert_ca_bundle(original or b"", "device ca.crt")
     assert original is not None  # narrowed by assert_ca_bundle
 
-    if our_cert_pem in original:
-        raise ValueError("Our certificate is already in the CA bundle")
+    import re
+    from cryptography import x509
 
-    original_count = original.count(b"-----BEGIN CERTIFICATE-----")
-    patched = original.rstrip() + b"\n\n" + our_cert_pem.strip() + b"\n"
+    our = x509.load_pem_x509_certificate(our_cert_pem)
+    blocks = re.findall(
+        rb"-----BEGIN CERTIFICATE-----.*?-----END CERTIFICATE-----",
+        original, re.DOTALL)
+    original_count = len(blocks)
+
+    kept: list[bytes] = []
+    dropped = 0
+    for block in blocks:
+        try:
+            cert = x509.load_pem_x509_certificate(block)
+        except Exception:
+            # Keep anything we cannot parse rather than risk losing a real CA.
+            kept.append(block.strip())
+            continue
+        if cert.subject == our.subject:
+            dropped += 1
+            continue
+        kept.append(block.strip())
+    kept.append(our_cert_pem.strip())
+
+    patched = b"\n\n".join(kept) + b"\n"
     patched_count = patched.count(b"-----BEGIN CERTIFICATE-----")
 
-    if patched_count != original_count + 1:
-        raise RuntimeError(f"Cert count mismatch: {original_count} -> {patched_count} (expected +1)")
+    if patched_count < 1 or our_cert_pem.strip() not in patched:
+        raise RuntimeError("CA bundle patch produced an unusable result")
 
-    log.info("Patched CA bundle: %d -> %d certs, %d -> %d bytes (md5 %s -> %s)",
-             original_count, patched_count, len(original), len(patched),
+    log.info("Patched CA bundle: %d -> %d certs (dropped %d stale copies of "
+             "ours), %d -> %d bytes (md5 %s -> %s)",
+             original_count, patched_count, dropped, len(original), len(patched),
              md5hex(original), md5hex(patched))
     return patched
 

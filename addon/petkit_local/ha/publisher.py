@@ -596,6 +596,17 @@ class HAPublisher:
             # Fall back to defaults so switch/number/select entities render a
             # value instead of "unknown" before the first setting change.
             settings = device.default_settings()
+        # Mirror a device-native setting onto the shared HA-facing alias so a
+        # switch addressing e.g. `feedSound` shows the `soundEnable` the D4H
+        # actually reports. A copy, so device.config["settings"] stays the
+        # device's own field names; the write side is ha/commands.py.
+        if settings:
+            from petkit_local.ha.commands import SETTING_FIELD_ALIASES
+            mirrored = dict(settings)
+            for ha_field, dev_field in SETTING_FIELD_ALIASES.items():
+                if ha_field not in mirrored and dev_field in mirrored:
+                    mirrored[ha_field] = mirrored[dev_field]
+            settings = mirrored
         # `schedule`/`feed_schedule` back the raw-JSON text entities.
         enabled = device.enabled_capabilities()
         return {

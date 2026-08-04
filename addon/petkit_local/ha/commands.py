@@ -39,6 +39,13 @@ Command = tuple[str, dict[str, Any]]
 
 PROPERTY_SET_SUFFIX = "property/set"
 
+#: HA settings fields whose shared (D4SH-derived) name differs from the field a
+#: camera feeder (D4H) actually honors. The device reports and accepts
+#: `soundEnable`; the shared "Feed Sound" switch addresses `feedSound`. Mirrored
+#: on read (ha/publisher.py) and written on BOTH names here, which is harmless
+#: on a model that knows only one of the two.
+SETTING_FIELD_ALIASES = {"feedSound": "soundEnable"}
+
 # Media capability toggles (ha/entities/switches.py::CAPABILITY_SWITCHES) route
 # here instead of the generic settings.<field> path below: they don't push
 # anything to the device — the STS response (dev_oss_sts_info_new_v2) is the
@@ -353,6 +360,12 @@ def handle_ha_command(device: Device, entity: EntityDef, payload: str) -> Comman
         log.warning("Could not coerce payload %r for entity '%s'", payload, entity.key)
         return None
 
-    device.config.setdefault("settings", {})[field] = value
+    settings = device.config.setdefault("settings", {})
+    settings[field] = value
+    params = {field: value}
+    alias = SETTING_FIELD_ALIASES.get(field)
+    if alias:
+        settings[alias] = value
+        params[alias] = value
     log.info("Setting %s=%s for device %d (optimistic + MQTT)", field, value, device.petkit_id)
-    return (PROPERTY_SET_SUFFIX, make_mqtt_property_set({field: value}))
+    return (PROPERTY_SET_SUFFIX, make_mqtt_property_set(params))

@@ -475,6 +475,33 @@ def apply_derived_state(device: Device, event_type: str, content: dict) -> None:
 
     elif code.kind == codes.KIND_FEEDING and code.role == codes.ROLE_DONE:
         device.state["lastFeed"] = _now_iso()
+        _accumulate_feed_totals(device, content)
+
+
+def _accumulate_feed_totals(device: Device, content: dict) -> None:
+    """Maintain today's "Times Dispensed" / "Total Dispensed" counters.
+
+    A camera feeder's `feedState.times` / `feedState.realAmountTotal` sensors
+    read an aggregate the device never reports — on real PetKit the cloud sums
+    it from feed events, so we do the same from each `feed_over`: count one
+    dispense and add its grams, resetting when the event's `day` (YYYYMMDD)
+    rolls over so the totals are per-day like the app's. A jammed feed
+    (`real_amount` 0, e.g. a `blk_d` outlet block) dispensed nothing, so it
+    neither counts nor adds — which is what "dispensed" has to mean. `feedState`
+    lives in `device.state`, which `apply_state_snapshot` only merges into and
+    no feeder state report carries `feedState`, so the running total survives
+    every subsequent event.
+    """
+    grams = to_float(content.get("real_amount", content.get("realAmount")), 0) or 0
+    if grams <= 0:
+        return
+    day = content.get("day")
+    fs = device.state.get("feedState")
+    if not isinstance(fs, dict) or (day is not None and fs.get("day") != day):
+        fs = {"day": day, "times": 0, "realAmountTotal": 0}
+    fs["times"] = int(fs.get("times", 0)) + 1
+    fs["realAmountTotal"] = round(float(fs.get("realAmountTotal", 0)) + grams, 1)
+    device.state["feedState"] = fs
 
 
 def _now_iso() -> str:
