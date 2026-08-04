@@ -642,7 +642,19 @@ class Device:
         if self.is_feeder and self.is_camera:
             return {"result": {
                 "detectMultiRange": mc("detectMultiRange", [[0, 1440]]),
-                "cameraMultiNew": mc("cameraMultiNew", [[0, 1440]]),
+                # The D4H firmware's cameraMultiNew parser
+                # (`pk_parse_cameraMultiNew_func`) expects an array of schedule
+                # OBJECTS `{enable, rpt, time}`, NOT a bare `[[start,end]]` pair
+                # (verified against a captured real-cloud response, and the
+                # litter path above already uses this shape). A bare pair fails
+                # to parse ("parse cameraMultiNew fail, data null"), so
+                # `camera_enable` is never set, the camera stays disabled, and
+                # every feed/eat reports `media:0` with nothing to upload. This
+                # all-day, all-week window keeps `camera_enable=1` so feed
+                # snapshots and eat clips record and upload.
+                "cameraMultiNew": mc("cameraMultiNew", [
+                    {"enable": 1, "rpt": "1,2,3,4,5,6,7", "time": [[0, 1440]]}
+                ]),
                 "toneMultiRange": mc("toneMultiRange", [[1320, 360]]),
                 "lightMultiRange": mc("lightMultiRange", [[0, 1440]]),
             }}
