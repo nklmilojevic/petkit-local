@@ -78,15 +78,18 @@ jobs:
   # failure there fails the push just as loudly.
   build:
     if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    # Each platform builds on its own native runner, so nothing is emulated.
+    runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
-        platform: [linux/amd64, linux/arm64]
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      # Emulation for arm64. Free on amd64, so not conditional.
-      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
       # TARGETARCH is a BuildKit built-in and the legacy builder leaves it
       # empty, so the per-arch go2rtc download needs buildx to work at all.
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
