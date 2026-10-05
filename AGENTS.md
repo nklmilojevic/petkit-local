@@ -13,7 +13,7 @@ in `addon/petkit_local/`. It also runs as a plain container or bare process (`do
 at the root, or `--no-ha`); HA Container and HA Core have no add-on system, so that path is
 supported, not a fallback.
 
-**Stack.** Python 3.11+, one asyncio loop, one container. aiohttp (device API, bucket, panel), amqtt
+**Stack.** Python 3.14 (the image's; CI tests only that), one asyncio loop, one container. aiohttp (device API, bucket, panel), amqtt
 (embedded device-facing broker), aiomqtt (client for HA's broker), SQLAlchemy 2.0 async + aiosqlite
 (`{data_dir}/petkit.db`), Jinja2, ffmpeg. Device identity and settings persist as atomic JSON
 (`devices.json`, `ble_devices.json`). `README.md` credits the projects the payloads came from.

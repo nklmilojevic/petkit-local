@@ -28,18 +28,23 @@ defaults:
 jobs:
   test:
     runs-on: ubuntu-latest
-    strategy:
-      # A 3.11-only breakage must not cancel the 3.12 job, and vice versa.
-      fail-fast: false
-      matrix:
-        # 3.11 is the floor declared in pyproject.toml, 3.12 is what the
-        # add-on image actually ships (Dockerfile: python:3.12-alpine on 64-bit).
-        python-version: ["3.11", "3.12"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Read the Python version the image ships
+        id: python
+        # The Dockerfile's FROM is the only Python pin, and Renovate bumps it,
+        # so the suite runs on exactly what users get and never on a version
+        # nothing ships.
+        run: |
+          version=$(sed -nE 's/^FROM python:([0-9.]+)-.*/\1/p' Dockerfile | sort -u)
+          if [ "$(printf '%s\n' "$version" | grep -c .)" != 1 ]; then
+            echo "::error::addon/Dockerfile must have exactly one python:X.Y version, found: ${version:-none}"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: ${{ steps.python.outputs.version }}
           cache: pip
           # setup-python resolves this from the repo root, not from
           # defaults.run.working-directory.
@@ -96,9 +101,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Read the Python version the image ships
+        id: python
+        run: |
+          version=$(sed -nE 's/^FROM python:([0-9.]+)-.*/\1/p' Dockerfile | sort -u)
+          if [ "$(printf '%s\n' "$version" | grep -c .)" != 1 ]; then
+            echo "::error::addon/Dockerfile must have exactly one python:X.Y version, found: ${version:-none}"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: "3.14"
+          python-version: ${{ steps.python.outputs.version }}
       # Narrow on purpose (see [tool.ruff.lint] in pyproject.toml): a gate
       # against real defects, not a style enforcer. Four unused imports reached
       # main before this existed, because the only check anyone ran locally was
