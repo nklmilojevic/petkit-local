@@ -22,7 +22,7 @@ predicates the rest of the code actually reads.
 #: The panel shows it because there is otherwise no way — for an owner or for
 #: us — to tell which build is running: a stale entity set looks exactly like an
 #: update that did not take.
-VERSION = "2.1.2"
+VERSION = "2.1.3"
 
 DEVICE_TYPES_LITTER = {"t3", "t4", "t5", "t6", "t7"}
 DEVICE_TYPES_FEEDER = {"feeder", "feedermini", "d3", "d4", "d4s", "d4h", "d4sh"}

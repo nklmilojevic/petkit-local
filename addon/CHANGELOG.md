@@ -1,5 +1,29 @@
 # Changelog
 
+## 2.1.3 — 2026-10-05
+
+One image now runs everywhere: the Home Assistant add-on, docker-compose and
+Kubernetes.
+
+- **The image starts correctly when you pass your own flags.** The program was
+  the image's default command, so anything that supplied arguments replaced it
+  entirely. A Kubernetes pod with `args:` tried to execute `--data-dir=/data`
+  and crash-looped. The program is now the entrypoint, and the default command
+  is just `--ha-addon`, so compose `command:` and Kubernetes `args:` take flags
+  only.
+  - **If you run it with docker-compose,** update your `command:` to list flags
+    only, as the shipped `docker-compose.yml` now does. A `command:` that still
+    starts with `python3 -m petkit_local.main` repeats the program and fails.
+- **The image has its own init (tini).** The app spawns ffmpeg and go2rtc and
+  has no stop-signal handler of its own, so outside the add-on it ignored
+  `docker stop` until the timeout and never cleaned up exited children. The
+  add-on now sets `init: false`, so the Supervisor does not add a second init.
+- **amd64 and arm64 only.** 32-bit ARM (armv7) is no longer built, and an
+  armv7 Home Assistant install is no longer offered the add-on. The image is a
+  single Alpine base on both architectures.
+- **Python 3.14.** The image moved from Python 3.12 to 3.14, and CI now tests
+  only the version the image ships.
+
 ## 2.1.2 — 2026-10-05
 
 - **Times Dispensed and Total Dispensed survive a restart.** The day's feed
