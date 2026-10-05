@@ -1,5 +1,30 @@
 # Changelog
 
+## 2.1.1 — 2026-10-05
+
+The project has moved to
+[nklmilojevic/petkit-local](https://github.com/nklmilojevic/petkit-local), a
+maintained fork of the original repository, which is no longer updated. It
+also ships three fixes that were waiting as pull requests upstream.
+
+- **The repository and image have moved.** Add
+  `https://github.com/nklmilojevic/petkit-local` as a repository and install
+  the add-on from it. The image is now `ghcr.io/nklmilojevic/petkit-local`.
+  Home Assistant treats an add-on from a new repository as a different add-on,
+  so copy its data across before you uninstall the old one.
+- **The panel no longer links to the original author's hosted provisioning
+  page.** To provision over Bluetooth, serve Home Assistant over HTTPS.
+- **Food Low is no longer backwards.** A feeder's `food` field reports whether
+  food is present, not whether it is short, so a full hopper used to read as
+  low. Food Low is now derived from presence. Confirmed on a live YumShare
+  Solo (D4H), which also confirms it sends the singular `food` field.
+- **A K3 linked to an HTTP-only parent now gets its battery and liquid
+  levels.** They ride in the parent's `dev_state_report` and in the `state`
+  block of every event report. Until now they were read only from MQTT, so the
+  K3 on an unpatched ESP32 box (T4, D4, D3) stayed `unknown`.
+- **A T4's Times Used is counted from its visits.** The firmware sends
+  `litter.usedTimes` as a constant 0, so the sensor read 0 every day.
+
 ## 2.1.0 — 2026-08-12
 
 The YumShare Dual-Hopper (D4SH) camera feeder is now confirmed working, and most
