@@ -39,7 +39,8 @@ from petkit_local.devices.state_tables import (CONSUMABLE_RECORD_KEY, CONSUMABLE
                                                W7H_STATE_FIELDS, WORK_MODE_IDLE)
 from petkit_local.events import codes
 from petkit_local.utils.coerce import to_float
-from petkit_local.utils.const import DEVICE_TYPES_FEEDER_NEXT_GEN
+from petkit_local.utils.const import (DEVICE_TYPES_FEEDER_NEXT_GEN,
+                                     DEVICE_TYPES_LITTER_USED_TIMES_UNREPORTED)
 from petkit_local.utils.dicts import dig
 
 #: The names this module answers to. The evidence tables live in
@@ -70,6 +71,7 @@ __all__ = [
     "normalize_property_params",
     "parse_state_report",
     "record_consumable_reset",
+    "reports_used_times",
 ]
 
 
@@ -160,6 +162,29 @@ def _extract_feeder_next_gen(body: dict[str, Any], state: dict[str, Any],
     _extract_sensor_block(body, state, FEEDER_HALLS)
 
 
+def _derive_food_low(state: dict[str, Any]) -> None:
+    """Turn the hopper-presence `food` into an explicit `foodLow` 0/1.
+
+    `food` is presence of food in the hopper, not a shortage flag: a live D4H
+    (fw 867) holds a steady 2 with a FULL hopper and reports 0 only when
+    nothing is detected -- transiently while food moves through during a
+    dispense, and for real once the hopper runs out. The shared "Food Low"
+    binary sensor used to read `food` through discovery's generic
+    truthy-is-ON template (`ha/discovery.py::_value_template`), so a full
+    hopper read as Food Low ON -- backwards. Deriving the flag here keeps the
+    raw `food` for the Hopper enum sensor and gives the problem sensor a
+    value that is 1 exactly when the device says nothing is there.
+
+    Gated on presence, the module's standing rule: a model that never sends
+    `food` (a D4SH says `food1`/`food2`) derives nothing. ONE helper called
+    from BOTH transports, for the reason spelled out on
+    `_extract_feeder_next_gen` -- today no MQTT table carries a singular
+    `food`, so the property/post call site is armed but idle until one does.
+    """
+    if "food" in state:
+        state["foodLow"] = 1 if to_float(state.get("food"), 2) == 0 else 0
+
+
 def _extract_presence_flags(body: dict[str, Any], state: dict[str, Any]) -> None:
     """Turn the presence-signalled fields into 0/1 in `state`.
 
@@ -192,6 +217,17 @@ def _extract_shared(body: dict[str, Any], state: dict[str, Any]) -> None:
     _extract_presence_flags(body, state)
 
 
+def reports_used_times(device_type: str | None) -> bool:
+    """Whether this model's `litter.usedTimes` is a real counter worth reading.
+
+    False for the models in `DEVICE_TYPES_LITTER_USED_TIMES_UNREPORTED`, which
+    send the field permanently pinned at zero — see that set for the evidence.
+    Both transports and both extract paths ask this, so the suppression cannot
+    hold on one of them and leak on the other.
+    """
+    return (device_type or "").lower() not in DEVICE_TYPES_LITTER_USED_TIMES_UNREPORTED
+
+
 def parse_state_report(device_type: str, body: dict[str, Any]) -> dict[str, Any]:
     """Flatten a state report for `device_type` into the keys HA entities read.
 
@@ -205,9 +241,9 @@ def parse_state_report(device_type: str, body: dict[str, Any]) -> dict[str, Any]
         return {}
 
     if device_type in ("t5", "t6", "t7"):
-        return _parse_litter_camera(body)
+        return _parse_litter_camera(body, device_type)
     if device_type in ("t3", "t4"):
-        return _parse_litter_esp32(body)
+        return _parse_litter_esp32(body, device_type)
     if device_type in ("d4h", "d4sh", "d4", "d3", "d4s", "feeder", "feedermini"):
         return _parse_feeder(body, device_type)
     if device_type in ("w4", "w5", "ctw2", "ctw3", "w7h"):
@@ -234,7 +270,8 @@ def _extract_camel(body: dict[str, Any], keys: list[str], state: dict[str, Any])
             state[key] = body[snake]
 
 
-def _extract_litter_nested(body: dict[str, Any], state: dict[str, Any]) -> None:
+def _extract_litter_nested(body: dict[str, Any], state: dict[str, Any],
+                           device_type: str = "") -> None:
     """Flatten the nested sub-objects a real litter box sends into `state`.
 
     Confirmed against a real T5. Sets, when the source is present: `sandWeight`,
@@ -252,7 +289,7 @@ def _extract_litter_nested(body: dict[str, Any], state: dict[str, Any]) -> None:
             state["sandWeight"] = litter["weight"]
         if "percent" in litter:
             state["sandPercent"] = litter["percent"]
-        if "usedTimes" in litter:
+        if "usedTimes" in litter and reports_used_times(device_type):
             state["usedTimes"] = litter["usedTimes"]
         if "sandType" in litter:
             state["sandType"] = litter["sandType"]
@@ -392,7 +429,7 @@ def _extract_work_mode(body: dict[str, Any], state: dict[str, Any]) -> None:
     # the same rule the rest of this module follows.
 
 
-def _parse_litter_camera(body: dict[str, Any]) -> dict[str, Any]:
+def _parse_litter_camera(body: dict[str, Any], device_type: str = "") -> dict[str, Any]:
     """State for the Ingenic camera litters (T5/T6/T7).
 
     The ESP32 litter set plus the camera, spray and package fields, and the
@@ -431,26 +468,34 @@ def _parse_litter_camera(body: dict[str, Any]) -> dict[str, Any]:
     ], state)
     # Extract from nested sub-objects (real T5 format). Placed AFTER
     # _extract_camel so nested values override any flat keys.
-    _extract_litter_nested(body, state)
+    _extract_litter_nested(body, state, device_type)
     _extract_sensor_block(body, state, LITTER_CAMERA_HALLS)
     _extract_ip(body, state)
     _extract_wifi_rssi(body, state)
     return state
 
 
-def _parse_litter_esp32(body: dict[str, Any]) -> dict[str, Any]:
-    """State for the ESP32 litters (T3/T4), which have no camera or spray fields."""
+def _parse_litter_esp32(body: dict[str, Any], device_type: str = "") -> dict[str, Any]:
+    """State for the ESP32 litters (T3/T4), which have no camera or spray fields.
+
+    `device_type` selects the `usedTimes` suppression: the T4 sends that field
+    hard-coded to zero, so reading it would publish a Times Used of 0 for a box
+    that is being used. See `reports_used_times`.
+    """
     state: dict[str, Any] = {}
     _extract_work_mode(body, state)
-    _extract_camel(body, [
+    keys = [
         "sandWeight", "sandPercent", "boxFull",
         "petInTime", "deodorantLeftDays", "errorMsg", "rssi",
         "usedTimes", "totalTime", "boxState", "power",
         "sprayResetTime", "liquidReset",
-    ], state)
+    ]
+    if not reports_used_times(device_type):
+        keys.remove("usedTimes")
+    _extract_camel(body, keys, state)
     # Extract from nested sub-objects (same nested format as camera models).
     # Placed AFTER _extract_camel so nested values override any flat keys.
-    _extract_litter_nested(body, state)
+    _extract_litter_nested(body, state, device_type)
     _extract_wifi_rssi(body, state)
     return state
 
@@ -491,6 +536,9 @@ def _parse_feeder(body: dict[str, Any], device_type: str = "") -> dict[str, Any]
     # Error sensor reads whatever the last transport to arrive had to say --
     # exactly the asymmetry this module's docstring calls the standard bug.
     _extract_error_flags(body, state, device_type)
+    # Explicit Food Low, derived from `food` presence -- see _derive_food_low
+    # for why the raw value cannot back a problem sensor directly.
+    _derive_food_low(state)
 
     feed_state = dig(body, "feedState", default=dig(body, "feed_state", default={}))
     if isinstance(feed_state, dict) and feed_state:
@@ -608,8 +656,11 @@ def normalize_property_params(device_type: str, params: dict[str, Any]) -> dict[
 
     litter = params.get("litter")
     if isinstance(litter, dict):
-        for src, dst in (("percent", "sandPercent"), ("weight", "sandWeight"),
-                         ("usedTimes", "usedTimes"), ("sandType", "sandType")):
+        pairs = [("percent", "sandPercent"), ("weight", "sandWeight"),
+                 ("usedTimes", "usedTimes"), ("sandType", "sandType")]
+        if not reports_used_times(device_type):
+            pairs.remove(("usedTimes", "usedTimes"))
+        for src, dst in pairs:
             if src in litter:
                 flat[dst] = litter[src]
 
@@ -626,6 +677,7 @@ def normalize_property_params(device_type: str, params: dict[str, Any]) -> dict[
 
     _extract_fountain_w7h(params, flat, device_type)
     _extract_feeder_next_gen(params, flat, device_type)
+    _derive_food_low(flat)
     if device_type.lower() in LITTER_CAMERA_MODELS:
         _extract_sensor_block(params, flat, LITTER_CAMERA_HALLS)
 
