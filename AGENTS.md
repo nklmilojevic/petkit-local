@@ -13,7 +13,7 @@ in `addon/petkit_local/`. It also runs as a plain container or bare process (`do
 at the root, or `--no-ha`); HA Container and HA Core have no add-on system, so that path is
 supported, not a fallback.
 
-**Stack.** Python 3.11+, one asyncio loop, one container. aiohttp (device API, bucket, panel), amqtt
+**Stack.** Python 3.14 (the image's; CI tests only that), one asyncio loop, one container. aiohttp (device API, bucket, panel), amqtt
 (embedded device-facing broker), aiomqtt (client for HA's broker), SQLAlchemy 2.0 async + aiosqlite
 (`{data_dir}/petkit.db`), Jinja2, ffmpeg. Device identity and settings persist as atomic JSON
 (`devices.json`, `ble_devices.json`). `README.md` credits the projects the payloads came from.
@@ -175,7 +175,8 @@ does not restart it.
 **`build.yaml` is dead** (removed in Supervisor 2026.04.0) and so is `ARG BUILD_FROM`: the Supervisor
 substitutes its own base image, one with no Python, and the build dies with `pip: not found`. The
 Dockerfile is the single source of truth now — hardcode `FROM`, and key anything per-arch on
-BuildKit's own `TARGETARCH` (which is what the 32-bit-ARM glibc base does).
+BuildKit's own `TARGETARCH` (which is what the go2rtc download does). The image is 64-bit only
+(amd64, arm64): `config.yaml`'s `arch` and the workflows' platform matrices must agree.
 
 ## Known limitations / unverified
 

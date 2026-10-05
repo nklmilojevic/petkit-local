@@ -348,4 +348,4 @@ but a modified version you distribute has to stay under the same terms with its 
 Third-party components keep their own licences: the reference work above (both Jezza34000 projects
 and ha-petkit are MIT), the shipped `dropbear-mipsel` binary carries its own notice in
 [`addon/petkit_local/web/static/bin/`](addon/petkit_local/web/static/bin/), and the image installs
-FFmpeg from Alpine (Debian on 32-bit ARM).
+FFmpeg from Alpine.

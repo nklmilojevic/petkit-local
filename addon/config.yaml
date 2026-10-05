@@ -13,20 +13,11 @@ url: "https://github.com/nklmilojevic/petkit-local"
 # workflow refuses a `v*` git tag whose version disagrees with this file, which
 # is what keeps the two from drifting apart.
 image: "ghcr.io/nklmilojevic/petkit-local"
-#
-# armv7 works only because the Dockerfile gives 32-bit ARM a glibc base — on the
-# musl one the other arches use, `cryptography` has no wheel and would have to
-# build from Rust source on a Pi. Read the Dockerfile's header before touching
-# its FROM lines; this list depends on them.
-#
-# Nobody here owns 32-bit ARM hardware, so armv7 is proven to BUILD (CI builds
-# every arch in this list under QEMU on each push) but has never been RUN on a
-# real device. Users no longer build it themselves, so a broken build now stops
-# the release instead of reaching them; running it is still untested.
+# 64-bit only. The Dockerfile has a single Alpine base and go2rtc binaries for
+# exactly these two; adding an arch here means adding it there too.
 arch:
   - aarch64
   - amd64
-  - armv7
 # Device-facing ports. The device speaks plain HTTP to the API and MQTT over
 # TLS on 443 (confirmed for both ESP32 and Ingenic from a real capture).
 # The embedded broker's plain listener (1883) is internal-only for the bridge

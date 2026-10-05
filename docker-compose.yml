@@ -18,8 +18,8 @@
 services:
   petkit-local:
     # Published by .github/workflows/publish.yml, and the same image the
-    # Home Assistant app pulls. One multi-architecture package covering amd64,
-    # arm64 and armv7, so Docker picks the right platform on its own — you do
+    # Home Assistant app pulls. One multi-architecture package covering amd64
+    # and arm64, so Docker picks the right platform on its own — you do
     # not choose one.
     #
     #   :latest   the newest release
