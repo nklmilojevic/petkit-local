@@ -35,9 +35,9 @@
 # prevent. Verified by experiment, not assumed.
 ARG TARGETARCH
 
-FROM python:3.12-alpine AS base-amd64
-FROM python:3.12-alpine AS base-arm64
-FROM python:3.12-slim AS base-arm
+FROM python:3.14-alpine AS base-amd64
+FROM python:3.14-alpine AS base-arm64
+FROM python:3.14-slim AS base-arm
 
 FROM base-${TARGETARCH}
 
