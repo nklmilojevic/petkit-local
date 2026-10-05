@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.1.1 — 2026-10-05
+
+The project has moved to
+[nklmilojevic/petkit-local](https://github.com/nklmilojevic/petkit-local), a
+maintained fork of the original repository, which is no longer updated. The
+code is the same as 2.1.0.
+
+- **The repository and image have moved.** Add
+  `https://github.com/nklmilojevic/petkit-local` as a repository and install
+  the add-on from it. The image is now `ghcr.io/nklmilojevic/petkit-local`.
+  Home Assistant treats an add-on from a new repository as a different add-on,
+  so copy its data across before you uninstall the old one.
+- **The panel no longer links to the original author's hosted provisioning
+  page.** To provision over Bluetooth, serve Home Assistant over HTTPS.
+
 ## 2.1.0 — 2026-08-12
 
 The YumShare Dual-Hopper (D4SH) camera feeder is now confirmed working, and most

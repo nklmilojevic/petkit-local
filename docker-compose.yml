@@ -28,8 +28,8 @@ services:
     #             a fix before it ships, with `docker compose up -d --pull always`
     #             (a moving tag is cached by digest, so Compose will not refetch
     #             it on its own). To hold one exact build, use its digest:
-    #             ghcr.io/alex-so-3/petkit-local@sha256:...
-    image: ghcr.io/alex-so-3/petkit-local:latest
+    #             ghcr.io/nklmilojevic/petkit-local@sha256:...
+    image: ghcr.io/nklmilojevic/petkit-local:latest
     #
     # To build it yourself instead — a local change, or an architecture nobody
     # publishes — comment out the line above and uncomment this, then

@@ -6,6 +6,11 @@ machine. Your device connects to it the same way it connected to them and behave
 that what it records now stays with you. It works with the internet unplugged, and Home Assistant is
 supported but not required.
 
+> **This is a maintained fork** of [alex-so-3/petkit-local](https://github.com/alex-so-3/petkit-local),
+> which is no longer updated. Development continues here, starting from its 2.1.0 release. If you
+> installed from the original repository, add this one and reinstall. See the 2.1.1 entry in the
+> [changelog](addon/CHANGELOG.md).
+
 <details>
 <summary><b>📸 Screenshots</b></summary>
 
@@ -173,7 +178,7 @@ talk you out of it.
 **Settings → Apps → Install app → ⋮ → Repositories**, add:
 
 ```
-https://github.com/alex-so-3/petkit-local
+https://github.com/nklmilojevic/petkit-local
 ```
 
 > Recent Home Assistant releases renamed **Add-ons** to **Apps** in the interface. If your menu still

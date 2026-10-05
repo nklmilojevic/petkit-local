@@ -137,18 +137,9 @@ async function loadProvision() {
 // message is only meaningful once the context is secure, because that is the
 // only situation in which the absence of the API means what it says.
 function provisionWarning(hasBt, secure) {
-  const HOSTED = 'https://petkit.2442.pl';
-  const hosted =
-    ' Or use the hosted provisioning page at <a href="' +
-    HOSTED +
-    '" target="_blank"><code>' +
-    HOSTED +
-    '</code></a>, which runs entirely in your browser and talks to the device over Bluetooth — it never sees your Wi-Fi password.';
   if (!secure)
     return {
-      card:
-        '⚠ Web Bluetooth only works on a <b>secure page</b>, and this one is plain HTTP. Serve Home Assistant over HTTPS with your own certificate — provisioning then works from this tab, Ingress included. You will need <b>Chrome or Edge</b> as well; a plain-HTTP page cannot tell whether you have one, because the browser hides Web Bluetooth entirely until the page is secure.' +
-        hosted,
+      card: '⚠ Web Bluetooth only works on a <b>secure page</b>, and this one is plain HTTP. Serve Home Assistant over HTTPS with your own certificate — provisioning then works from this tab, Ingress included. You will need <b>Chrome or Edge</b> as well; a plain-HTTP page cannot tell whether you have one, because the browser hides Web Bluetooth entirely until the page is secure.',
       tooltip: 'Web Bluetooth needs a secure page, and this one is plain HTTP. See the note above.',
     };
   if (!hasBt)

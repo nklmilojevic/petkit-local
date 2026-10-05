@@ -2,7 +2,7 @@
 
 ## Reporting a vulnerability
 
-Open a [GitHub security advisory](https://github.com/alex-so-3/petkit-local/security/advisories/new),
+Open a [GitHub security advisory](https://github.com/nklmilojevic/petkit-local/security/advisories/new),
 or a normal issue if the problem is not sensitive. There is no formal SLA — this
 is a hobby project — but security reports are read first.
 

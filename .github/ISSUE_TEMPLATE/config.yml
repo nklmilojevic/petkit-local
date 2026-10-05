@@ -1,8 +1,8 @@
 blank_issues_enabled: true
 contact_links:
   - name: Which models are supported
-    url: https://github.com/alex-so-3/petkit-local#-supported-devices
+    url: https://github.com/nklmilojevic/petkit-local#-supported-devices
     about: One model is confirmed working; the rest is inference. Yours may already be listed.
   - name: Pointing a device at it
-    url: https://github.com/alex-so-3/petkit-local#-point-a-device-at-it
+    url: https://github.com/nklmilojevic/petkit-local#-point-a-device-at-it
     about: Bluetooth provisioning, DNS redirects, and why HTTPS models need the first one.

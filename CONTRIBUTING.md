@@ -7,7 +7,7 @@ wrong. But one person owns one litter box, so every other model in the README is
 inference until somebody says otherwise, and only an owner can change that. *"T4, everything
 works"* is enough to move a model up the table, and issues that report nothing
 wrong are welcome here. There is a
-[Device report](https://github.com/alex-so-3/petkit-local/issues/new?template=device_report.yml)
+[Device report](https://github.com/nklmilojevic/petkit-local/issues/new?template=device_report.yml)
 template that asks for nothing you would have to go and collect.
 
 Also welcome:
@@ -97,7 +97,7 @@ file; `CLAUDE.md` is a two-line stub that imports it.)
 ## Releasing
 
 Images are published to GHCR by `.github/workflows/publish.yml` as a single
-multi-architecture package, `ghcr.io/alex-so-3/petkit-local`. That is what the
+multi-architecture package, `ghcr.io/nklmilojevic/petkit-local`. That is what the
 add-on documentation asks for — a per-architecture name with `{arch}` in it is
 described there as a compatibility fallback — and it is also the only shape
 docker-compose can use, since Compose has no `{arch}` substitution.
