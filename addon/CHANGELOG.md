@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.1.2 — 2026-10-05
+
+- **Times Dispensed and Total Dispensed survive a restart.** The day's feed
+  totals are computed from feed events, and no device report carries them, so
+  restarting the add-on used to zero both counters mid-day with no way to
+  recover the count. They are now saved with the device and still reset when
+  the day changes. Over MQTT, a feed event that carries no state snapshot now
+  triggers the save too.
+- **The bucket certificate also names each IP address as a DNS name.** The
+  device's media uploader does not reliably match an IP against an IP-address
+  entry, so a camera feeder that reaches the bucket by IP could fail to
+  upload. This applies only to newly generated certificates: an existing one is
+  never re-issued, because that would invalidate the copy the CA patcher
+  installed on each device.
+
 ## 2.1.1 — 2026-10-05
 
 The project has moved to
