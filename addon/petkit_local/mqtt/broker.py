@@ -146,6 +146,10 @@ def ensure_self_signed(cert_path: str, key_path: str,
             seen.add(host)
             try:
                 san_names.append(x509.IPAddress(ipaddress.ip_address(host)))
+                # Again as a name: the media uploader's libcurl + OpenSSL 1.0.0
+                # does not reliably match an IP literal against an iPAddress
+                # SAN, only against CN and DNS names, and it verifies strictly.
+                san_names.append(x509.DNSName(host))
             except ValueError:
                 # Not an address, so it is a name — and a name is exactly the
                 # case an IP SAN can never satisfy.

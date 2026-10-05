@@ -552,9 +552,9 @@ def _accumulate_feed_totals(device: Device, content: dict) -> None:
     feed that dispensed nothing — a jam, an outlet block — is not a dispense,
     so it neither counts nor adds.
 
-    NOT persisted: `Device.to_dict` deliberately excludes `state`, and this
-    stays inside it. The totals are lost on restart and rebuilt from the day's
-    remaining feeds, which is the same trade every other `state` key makes.
+    Persisted, unlike the rest of `state`: `Device.to_dict` carries
+    `feedState` across a restart, because no device report could rebuild it
+    and the day's counters would otherwise restart from zero.
     """
     grams = sum(
         to_float(content.get(key), 0) or 0

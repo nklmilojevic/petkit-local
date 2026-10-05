@@ -386,9 +386,13 @@ class Device:
         Live state (`state`, `command_queue`, the liveness timestamps and flags)
         is deliberately excluded — it is re-derived from the device's next
         contact, and persisting it would resurrect a stale "online" after a
-        restart.
+        restart. The one exception is `feedState`: it is a running daily total
+        computed from feed events (`events/normalize.py`), not telemetry, and no
+        device report could ever rebuild it, so without it Times/Total Dispensed
+        drop to zero mid-day on every restart. Its own day check re-zeros it
+        when the day actually changes.
         """
-        return {
+        result = {
             "device_type": self.device_type,
             "petkit_id": self.petkit_id,
             "serial_number": self.serial_number,
@@ -405,6 +409,10 @@ class Device:
             "config": self.config,
             "created_at": self.created_at,
         }
+        feed_state = self.state.get("feedState")
+        if isinstance(feed_state, dict):
+            result["feed_state"] = feed_state
+        return result
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Device:
@@ -431,4 +439,7 @@ class Device:
         d.api_secret = data.get("api_secret", d.api_secret)
         d.config = data.get("config", {})
         d.created_at = data.get("created_at", d.created_at)
+        feed_state = data.get("feed_state")
+        if isinstance(feed_state, dict):
+            d.state["feedState"] = feed_state
         return d
