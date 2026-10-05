@@ -175,7 +175,8 @@ does not restart it.
 **`build.yaml` is dead** (removed in Supervisor 2026.04.0) and so is `ARG BUILD_FROM`: the Supervisor
 substitutes its own base image, one with no Python, and the build dies with `pip: not found`. The
 Dockerfile is the single source of truth now — hardcode `FROM`, and key anything per-arch on
-BuildKit's own `TARGETARCH` (which is what the 32-bit-ARM glibc base does).
+BuildKit's own `TARGETARCH` (which is what the go2rtc download does). The image is 64-bit only
+(amd64, arm64): `config.yaml`'s `arch` and the workflows' platform matrices must agree.
 
 ## Known limitations / unverified
 

@@ -43,13 +43,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [linux/amd64, linux/arm64, linux/arm/v7]
+        platform: [linux/amd64, linux/arm64]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      # Emulation for the two ARM targets, and buildx because TARGETARCH is a
-      # BuildKit built-in that the legacy builder leaves empty -- the per-arch
-      # base selection in the Dockerfile does not work without it.
+      # Emulation for arm64, and buildx because TARGETARCH is a BuildKit
+      # built-in that the legacy builder leaves empty -- the per-arch go2rtc
+      # download in the Dockerfile does not work without it.
       - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
