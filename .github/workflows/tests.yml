@@ -98,7 +98,35 @@ jobs:
         with:
           context: ./addon
           platforms: ${{ matrix.platform }}
-          push: false
+          load: true
+          tags: petkit-local:ci
+      # Run it the way compose and Kubernetes do: flags only (they replace CMD,
+      # never ENTRYPOINT), as a non-root uid, with no Docker `--init`. A build
+      # that passes says nothing about whether a pod starts: this exact image
+      # crash-looped in a cluster because its program sat in CMD.
+      - name: Start it with flags only, as uid 1000
+        run: |
+          docker run -d --name smoke --user 1000:1000 \
+            --mount type=tmpfs,destination=/data,tmpfs-mode=1777 \
+            --mount type=tmpfs,destination=/media/petkit,tmpfs-mode=1777 \
+            -p 8099:8099 petkit-local:ci \
+            --data-dir=/data --port=8080 --api-url=http://127.0.0.1:8080/6/ --no-ha
+          for i in $(seq 1 30); do
+            curl -fsS -o /dev/null http://127.0.0.1:8099/ && { echo "panel up after ${i}s"; exit 0; }
+            sleep 1
+          done
+          docker logs smoke
+          echo "::error::the panel never answered on :8099"
+          exit 1
+      # tini as PID 1 forwards SIGTERM. Without it the app, which installs no
+      # handler, ignores the signal and every stop waits out the full timeout.
+      - name: Stop it within the grace period
+        run: |
+          start=$(date +%s)
+          docker stop -t 20 smoke
+          took=$(( $(date +%s) - start ))
+          echo "stopped in ${took}s"
+          [ "$took" -lt 15 ] || { docker logs smoke; echo "::error::SIGTERM was ignored (took ${took}s)"; exit 1; }
 
   lint:
     runs-on: ubuntu-latest

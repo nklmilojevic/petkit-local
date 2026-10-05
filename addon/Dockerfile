@@ -1,5 +1,5 @@
-# Plain Python base (no s6-overlay): the app runs directly as the container
-# process, so Docker's init (tini) as PID 1 is correct — no PID-1/s6 conflict.
+# ONE image for every way this runs: the Home Assistant add-on, docker-compose
+# and Kubernetes. Plain Python base, no s6-overlay.
 #
 # 64-bit only: amd64 and arm64 (aarch64). Both have musllinux wheels for every
 # dependency, so a single Alpine base installs everything without compiling.
@@ -17,8 +17,10 @@ COPY requirements.txt .
 # ffmpeg: stream-copy remux of the device's raw .ts clips to .mp4 (see
 # media/transcode.py). Missing ffmpeg degrades gracefully (clips stay as .ts),
 # but every camera model needs it, so always install it.
+#
+# tini: PID 1 (see the ENTRYPOINT below).
 RUN set -eux; \
-    apk add --no-cache ffmpeg; \
+    apk add --no-cache ffmpeg tini; \
     pip install --no-cache-dir -r requirements.txt
 
 # go2rtc: the camera sidecar (media/go2rtc.py). It is the ONLY safe way to give
@@ -54,5 +56,17 @@ COPY petkit_local ./petkit_local
 ENV PYTHONPATH=/opt/petkit-local \
     PYTHONUNBUFFERED=1
 
-# Self-configures from /data/options.json + the Supervisor MQTT service.
-CMD ["python3", "-m", "petkit_local.main", "--ha-addon"]
+# The program is the ENTRYPOINT and only its flags are the CMD, so a deployer
+# passes flags alone: compose `command:` and Kubernetes `args:` replace CMD and
+# nothing else. With the program in CMD instead, `args: [--data-dir=/data]`
+# made the runtime exec `--data-dir=/data` itself and the pod crash-looped.
+#
+# tini is PID 1 because the app installs no SIGTERM handler and starts ffmpeg
+# and go2rtc: as PID 1 itself it would ignore the stop signal (every restart
+# waits out the kill timeout) and never reap those children. Docker's own
+# `--init` would do the same, but compose and Kubernetes do not add it, so the
+# image brings it, and config.yaml turns the Supervisor's off (`init: false`).
+ENTRYPOINT ["/sbin/tini", "--", "python3", "-m", "petkit_local.main"]
+# The add-on default: self-configure from /data/options.json + the Supervisor
+# MQTT service. Any other deployment replaces this with its own flags.
+CMD ["--ha-addon"]
