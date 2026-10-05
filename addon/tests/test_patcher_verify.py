@@ -201,6 +201,25 @@ def test_a_generated_cert_names_the_address_devices_are_told_to_dial(tmp_path):
     assert "bucket.example.test" in san.get_values_for_type(x509.DNSName)
 
 
+def test_a_generated_cert_names_an_address_both_ways(tmp_path):
+    """The media uploader's old libcurl matches an IP literal against DNS
+    names, not reliably against an iPAddress SAN, and it verifies strictly."""
+    pytest.importorskip("cryptography")
+    import ipaddress
+
+    from cryptography import x509
+
+    from petkit_local.mqtt.broker import ensure_self_signed
+
+    cert, key = tmp_path / "b.crt", tmp_path / "b.key"
+    assert ensure_self_signed(str(cert), str(key), extra_hosts=["10.40.0.33"])
+
+    san = (x509.load_pem_x509_certificate(cert.read_bytes())
+           .extensions.get_extension_for_class(x509.SubjectAlternativeName).value)
+    assert ipaddress.ip_address("10.40.0.33") in san.get_values_for_type(x509.IPAddress)
+    assert "10.40.0.33" in san.get_values_for_type(x509.DNSName)
+
+
 def test_an_existing_cert_is_warned_about_and_never_silently_re_issued(tmp_path, caplog):
     """Re-issuing invalidates the copy the CA patcher put in every patched
     device, so a silent refresh would cut working installs off from media

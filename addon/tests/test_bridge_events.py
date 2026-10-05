@@ -121,3 +121,23 @@ async def test_the_request_credential_never_lands_in_device_state():
     # The telemetry beside it still applies, or this would be a silent regression.
     assert device.state["sandPercent"] == 40
     assert device.state["totalTime"] == 900
+
+
+async def test_a_feed_without_a_snapshot_still_persists_the_day_totals():
+    """Feed totals are the one derived value kept across a restart. Over MQTT a
+    `feed_over` need not carry a state snapshot, and nothing else would have
+    scheduled the write."""
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "devices.json"
+        reg = DeviceRegistry(path)
+        dev = reg.get_or_create(petkit_id=11, device_type="d4h", serial_number="SN")
+        reg.save()
+        bridge = MQTTBridge(reg, FakePublisher())
+
+        await bridge._handle_event(dev, "feed_over", {
+            "params": {"content": json.dumps({"day": 20261005, "real_amount": 10})}
+        })
+        await reg.flush()
+
+        restored = DeviceRegistry(path).get(11)
+        assert restored.state["feedState"]["times"] == 1

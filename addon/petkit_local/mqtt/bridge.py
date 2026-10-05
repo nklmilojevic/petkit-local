@@ -438,6 +438,10 @@ class MQTTBridge:
         # state parser. Shared with the HTTP path (`handlers/stubs.py`) so the
         # two transports cannot drift — which is exactly what had happened.
         apply_derived_state(device, event_type, content)
+        # Some of what that derives is persisted (`feedState`), and an event
+        # without a snapshot would otherwise never schedule the write. The
+        # HTTP path marks dirty here unconditionally too.
+        self._registry.mark_dirty()
 
         if event_type == "property":
             if params:

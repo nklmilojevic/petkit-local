@@ -266,13 +266,29 @@ def test_the_totals_start_over_when_the_device_says_the_day_changed():
                                       "realAmountTotal": 4}
 
 
-def test_the_feed_totals_are_not_persisted():
-    """`Device.to_dict` excludes `state` on purpose and this lives there."""
+def test_the_feed_totals_survive_a_restart():
+    """No device report carries them, so a restart that dropped them would zero
+    Times/Total Dispensed mid-day, and nothing could put the count back."""
     from petkit_local.events import normalize
 
     dev = Device(device_type="d4h", petkit_id=14)
     normalize.apply_derived_state(dev, "feed_over", {"day": 20260808, "real_amount": 10})
-    assert "feedState" not in json.dumps(dev.to_dict())
+    restored = Device.from_dict(json.loads(json.dumps(dev.to_dict())))
+    assert restored.state["feedState"] == {"day": 20260808, "times": 1, "realAmountTotal": 10}
+
+    normalize.apply_derived_state(restored, "feed_over", {"day": 20260808, "real_amount": 5})
+    assert restored.state["feedState"]["times"] == 2
+    assert restored.state["feedState"]["realAmountTotal"] == 15
+
+
+def test_only_the_feed_totals_are_persisted_from_state():
+    """The rest of `state` is live telemetry: restoring it would resurrect a
+    stale reading after a restart."""
+    dev = Device(device_type="d4h", petkit_id=14)
+    dev.state.update({"food": 2, "feedState": "not a dict"})
+    data = dev.to_dict()
+    assert "feed_state" not in data
+    assert "food" not in json.dumps(data)
 
 
 def test_pressing_reset_desiccant_starts_its_countdown():
