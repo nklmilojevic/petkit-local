@@ -1,6 +1,6 @@
 name: "PetKit Local"
 description: "Local cloud replacement for PetKit litter boxes, feeders, fountains and accessories"
-version: "2.1.1"
+version: "2.1.2"
 slug: "petkitlocal"
 url: "https://github.com/nklmilojevic/petkit-local"
 # Pull a published image rather than building on the user's machine. One
