@@ -96,10 +96,9 @@ services:
       # directory to browse them from HA, or leave it local.
       - ./media:/media/petkit
 
+    # Flags only: the image's ENTRYPOINT is the program, and this replaces its
+    # default `--ha-addon`.
     command:
-      - python3
-      - -m
-      - petkit_local.main
       - --data-dir=/data
       # The address the DEVICE will call, and the most important value in
       # this setup — see `.env.example` for what it has to be. The port in it

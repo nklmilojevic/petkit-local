@@ -92,4 +92,7 @@ schema:
   mqtt_tls_port: port
   mqtt_strict_auth: bool
 startup: application
+# The image runs its own init (tini, see the Dockerfile's ENTRYPOINT), so the
+# Supervisor must not add Docker's on top of it.
+init: false
 boot: auto
