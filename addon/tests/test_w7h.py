@@ -494,6 +494,21 @@ def test_every_settable_w7h_field_is_one_the_firmware_dispatches():
     assert checked >= 19, f"only {checked} settable entities checked"
 
 
+def test_a_freshly_adopted_fountain_keeps_flowing():
+    """Issue #21: the device applies `dev_device_info` at signup, so a seeded
+    `fountainMode: 0` (`do_not_flow`) stopped the pump and a seeded
+    `addWaterSwitch: 0` stopped the refill. The values are a W7H's own, read
+    from its `/opt/user.conf` before it was adopted."""
+    from petkit_local.devices.payloads import to_device_info
+
+    device = Device(device_type="w7h", petkit_id=1, serial_number="SN")
+    settings = to_device_info(device)["result"]["settings"]
+
+    assert settings["fountainMode"] == 1
+    assert settings["addWaterSwitch"] == 1
+    assert settings["petDetection"] == 1
+
+
 def test_the_settings_envelope_matches_what_the_device_was_seen_to_accept():
     """Shape pinned against a real `thing/service/property/set` captured on the
     wire to this device (2026-07-31)."""
