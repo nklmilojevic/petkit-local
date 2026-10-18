@@ -160,10 +160,16 @@ def default_settings(device: Device) -> dict[str, Any]:
             })
         return base
     if device.is_water_fountain:
+        # `fountainMode`, `addWaterSwitch` and `petDetection` are what a W7H
+        # ships with (its own `/opt/user.conf`, issue #21). They were seeded as
+        # 0, and the device applies `dev_device_info` at signup: `fountainMode:
+        # 0` is `do_not_flow`, so adopting a fountain stopped its pump and
+        # turned off auto-refill, and the first sign was a dry bowl. A fountain
+        # reports none of these back, so nothing would ever have corrected it.
         return {
             "manualLock": 0, "lightMode": 0, "disturbMode": 0,
-            "addWaterSwitch": 0, "petDetection": 0, "heaterSwitch": 0,
-            "fountainMode": 0, "fountainTime": 12, "sleepTime": 12,
+            "addWaterSwitch": 1, "petDetection": 1, "heaterSwitch": 0,
+            "fountainMode": 1, "fountainTime": 12, "sleepTime": 12,
         }
     if device.is_purifier:
         return {
