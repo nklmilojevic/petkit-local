@@ -125,12 +125,21 @@ every tag and keeps whatever they reference. The workflow refuses a `v*` tag who
 version does not match `addon/config.yaml`, because an image under a version the
 Supervisor never asks for is worse than no image.
 
-A release is therefore:
+A release is cut from a clean `main` with vesnik:
 
-1. One commit that bumps `addon/config.yaml`, `addon/petkit_local/utils/const.py`
-   and `addon/pyproject.toml` together (`tests/test_version.py` checks they
-   agree) and adds the `## X.Y.Z` section to `addon/CHANGELOG.md`.
-2. `git tag vX.Y.Z && git push --tags`, which builds and publishes all three.
+```sh
+vesnik release --yes
+```
+
+It bumps `addon/config.yaml`, `addon/petkit_local/utils/const.py` and
+`addon/pyproject.toml` together, prepends a `## vX.Y.Z` section to
+`addon/CHANGELOG.md`, commits `chore(release): vX.Y.Z`, tags it and pushes both to
+`main`. The tag starts `publish.yml`, which builds and publishes all three.
+`tests/test_version.py` checks that the three versions agree.
+
+Never pass `--pre`. The Supervisor offers only plain versions, and
+`tests/test_version.py` rejects a suffix, so a pre-release tag is never offered as an
+update.
 
 A package created by a workflow inherits the repository's visibility, so a
 public repo publishes a public package with nothing to click. Verify it anyway
