@@ -1,0 +1,17 @@
+provider: claude
+model: claude-haiku-5-5
+
+style:
+  product: "a local cloud replacement for PetKit litter boxes, feeders, fountains and accessories"
+
+changelog:
+  file: addon/CHANGELOG.md
+
+packages:
+  - files:
+      - file: addon/config.yaml
+        key: version
+      - file: addon/pyproject.toml
+        key: project.version
+      - file: addon/petkit_local/utils/const.py
+        regex: 'VERSION = "(?P<v>[^"]+)"'

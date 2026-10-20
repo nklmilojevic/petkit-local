@@ -48,6 +48,6 @@ def test_the_changelog_documents_the_current_version():
     """A release whose changelog was forgotten is one nobody can tell apart from
     the one before it."""
     changelog = (ADDON / "CHANGELOG.md").read_text()
-    assert re.search(rf"^## {re.escape(VERSION)}\b", changelog, re.MULTILINE), (
+    assert re.search(rf"^## v?{re.escape(VERSION)}\b", changelog, re.MULTILINE), (
         f"CHANGELOG.md has no `## {VERSION}` section"
     )
