@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.1.4 - 2026-10-20
+
+This release fixes the default settings of newly adopted fountains. The pump and auto-refill now stay on after adoption.
+
+### Fixes
+
+- A newly adopted fountain keeps its pump on. The default `fountainMode` is now `1` (continuous) instead of `0` (do_not_flow).
+- A newly adopted fountain keeps auto-refill on. The defaults for `addWaterSwitch` and `petDetection` are now `1`.
+- Before this fix, the water bowl could run dry. A fountain does not report these settings, so nothing corrected the old defaults.
+
 ## 2.1.3 — 2026-10-05
 
 One image now runs everywhere: the Home Assistant add-on, docker-compose and
