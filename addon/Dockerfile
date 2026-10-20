@@ -8,7 +8,7 @@
 # its `build_from` were removed in Supervisor 2026.04.0, and the Supervisor now
 # substitutes its own base image (one with no Python in it), so the build dies
 # with `pip: not found`. The base is hardcoded here instead.
-FROM python:3.14-alpine
+FROM python:3.15-alpine
 
 WORKDIR /opt/petkit-local
 
