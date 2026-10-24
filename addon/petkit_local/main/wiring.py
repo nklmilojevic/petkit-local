@@ -8,6 +8,8 @@ publishes through the bridge) are visible next to each other.
 """
 from __future__ import annotations
 
+import logging
+import time
 from dataclasses import dataclass
 from functools import partial
 from typing import TYPE_CHECKING, Any
@@ -20,6 +22,7 @@ from petkit_local.config import Config
 from petkit_local.devices.ble import BLERegistry
 from petkit_local.devices.registry import DeviceRegistry
 from petkit_local.events.store import EventStore
+from petkit_local.ha.commands import PROPERTY_SET_SUFFIX, make_mqtt_property_set
 from petkit_local.ha.publisher import HAPublisher
 from petkit_local.http.redact import RedactionPolicy
 from petkit_local.http.server import create_app
@@ -32,12 +35,23 @@ from petkit_local.mqtt.ble_relay import update_linked_k3
 from petkit_local.mqtt.upstream import (
     CREDENTIALS_FILENAME, UpstreamCredentials, UpstreamMQTT,
 )
+from petkit_local.utils.coerce import to_float
 from petkit_local.web.hub import EventHub
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     import argparse
 
     from petkit_local.devices.base import Device
+
+log = logging.getLogger(__name__)
+
+#: The device reads its own offset back as `%.1f`, so `5.75` returns as `5.8`.
+#: Anything closer than this is the same zone, not drift worth a push.
+_TZ_SAME = 0.051
+
+#: How long to wait for a pushed zone to show up in state reports before
+#: pushing again. The device polls every ~10 s and reports state every ~30 s.
+_TZ_RETRY_SEC = 600
 
 
 @dataclass(frozen=True)
@@ -125,9 +139,10 @@ class _LocalRepublisher:
             await client.publish(topic, payload)
 
 
-async def _on_state_report(ha_publisher: HAPublisher, ble_registry: BLERegistry | None,
+async def _on_state_report(ha_publisher: HAPublisher | None, ble_registry: BLERegistry | None,
                            device: Device, body: dict) -> None:
-    """Mirror a freshly parsed state report into HA — parent AND any linked K3.
+    """Mirror a freshly parsed state report into HA — parent AND any linked K3 —
+    and put the device's clock back in its own zone if it has drifted.
 
     On an unpatched ESP32 (T4, D4, D3) the device only ever HTTP-heartbeats,
     so its property/post never reaches the MQTT bridge and the K3 piggyback
@@ -137,16 +152,70 @@ async def _on_state_report(ha_publisher: HAPublisher, ble_registry: BLERegistry 
     "ONE helper called from BOTH transports" rule the feeder parser already
     follows.
 
-    Only installed when HA publishing is enabled; the HTTP handler
-    treats a missing hook as "nothing to notify", so no other code
-    has to know whether HA is configured.
+    Installed whether or not HA publishing is enabled, because the timezone
+    check does not depend on HA; the HA half is skipped without a publisher.
     """
+    queue_timezone_if_drifted(device, body.get("timezone") if isinstance(body, dict) else None)
+    if ha_publisher is None:
+        return
     await ha_publisher.publish_state(device)
     await ha_publisher.publish_availability(device)
     k3 = update_linked_k3(device, body, ble_registry)
     if k3:
         await ha_publisher.publish_ble_discovery(k3)
         await ha_publisher.publish_ble_state(k3)
+
+
+def _is_timezone_set(cmd: Any) -> bool:
+    """Whether a queued command is a `property.set` carrying `timezone`."""
+    params = cmd.get("params") if isinstance(cmd, dict) else None
+    return isinstance(params, dict) and "timezone" in params
+
+
+#: When each device was last sent a corrective push, so a device that takes a
+#: while to report its new zone is not re-sent one on every state report.
+_last_timezone_push: dict[int, float] = {}
+
+
+def queue_timezone_if_drifted(device: Device, live_zone: Any,
+                              now: float | None = None) -> bool:
+    """Queue a runtime timezone push when the device's clock has left its zone.
+
+    A device that reboots comes back on UTC: an EverSweet Ultra (W7H, firmware
+    456) signs up reporting its configured `timezone=-7.0`, but its state
+    reports then say `"timezone": "0.0"` and its video watermarks read UTC.
+    Serving the right NUMBER in `dev_signup`/`dev_device_info` does not move the
+    firmware's clock; only a `property.set` whose value is a JSON STRING does
+    (see `web/api/devices.py::api_timezone`), and only until the next reboot.
+    So `live_zone`, the `timezone` a state report carries, is the one to check
+    after every report. (The state parsers do not keep that key, so the caller
+    passes it from the report body.)
+
+    Goes to the heartbeat queue, which the device drains on its next poll. An
+    earlier queued timezone push is replaced rather than stacked, and a device
+    pushed within `_TZ_RETRY_SEC` is left alone while its echo arrives. Does
+    nothing for a report carrying no zone, or a device already in the right
+    zone (the readback is `%.1f`, so 5.75 returns as 5.8).
+
+    Returns whether a push was queued.
+    """
+    current = to_float(live_zone, None)
+    if current is None:
+        return False
+    want = device.timezone_offset
+    if abs(current - want) < _TZ_SAME:
+        return False
+    now = time.time() if now is None else now
+    if now - _last_timezone_push.get(device.petkit_id, float("-inf")) < _TZ_RETRY_SEC:
+        return False
+    _last_timezone_push[device.petkit_id] = now
+    device.command_queue[:] = [c for c in device.command_queue if not _is_timezone_set(c)]
+    envelope = make_mqtt_property_set({"timezone": f"{want:g}"})
+    envelope["_service_suffix"] = PROPERTY_SET_SUFFIX
+    device.command_queue.append(envelope)
+    log.info("Device %d reports UTC offset %g but belongs at %g; "
+             "queued a timezone push", device.petkit_id, current, want)
+    return True
 
 
 async def _on_signup(ha_publisher: HAPublisher | None, device: Device) -> None:
@@ -250,9 +319,7 @@ def build_services(config: Config, args: argparse.Namespace) -> Services:
     # `AppRunner` freezes the app — a frozen Application rejects new keys.
     app[BACKGROUND_TASKS] = []
 
-    if ha_publisher:
-        app["on_state_report"] = partial(_on_state_report, ha_publisher, ble_registry)
-
+    app["on_state_report"] = partial(_on_state_report, ha_publisher, ble_registry)
     app["on_signup"] = partial(_on_signup, ha_publisher)
     app["on_device_seen"] = partial(_on_device_seen, ha_publisher)
 
